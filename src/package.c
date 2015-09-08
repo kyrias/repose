@@ -207,7 +207,6 @@ void package_free(pkg_t *pkg)
     free(pkg->desc);
     free(pkg->url);
     free(pkg->packager);
-    free(pkg->md5sum);
     free(pkg->sha256sum);
     free(pkg->base64sig);
     free(pkg->arch);
