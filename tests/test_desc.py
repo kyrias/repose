@@ -1,5 +1,4 @@
 import pytest
-import weakref
 
 
 REPOSE_DESC = b'''%FILENAME%
@@ -55,14 +54,13 @@ git
 '''
 
 
-global_weakkeydict = weakref.WeakKeyDictionary()
 def new_pkg(ffi, name, version):
     name = ffi.new('char[]', name)
     version = ffi.new('char[]', version)
     pkg = ffi.new('struct pkg*', {'name': name,
                                   'version': version})
 
-    global_weakkeydict[pkg] = (name, version)
+    pytest.weakkeydict[pkg] = (name, version)
     return pkg
 
 

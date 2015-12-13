@@ -155,7 +155,6 @@ ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
         }
     }
 
-    /* free(reader); */
     return 0;
 }
 
@@ -183,5 +182,6 @@ void read_desc(struct archive *archive, struct pkg *pkg)
         size_t nbytes_r = sizeof(buf);
         archive_read_block(archive, buf, &nbytes_r);
         parse_pkginfo(&parser, pkg, buf, nbytes_r);
+        break;
     }
 }

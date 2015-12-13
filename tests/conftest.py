@@ -1,4 +1,5 @@
 import pytest
+import weakref
 import cffi
 
 _ffi = cffi.FFI()
@@ -94,7 +95,8 @@ ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
 def pytest_namespace():
     _ffi.compile(tmpdir='tests')
     import _repose
-    return {'_repose': _repose}
+    return {'weakkeydict': weakref.WeakKeyDictionary(),
+            '_repose': _repose}
 
 
 @pytest.fixture(scope='session')
