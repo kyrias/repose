@@ -5,13 +5,18 @@ cache: bundler
 python:
   - pypy
 
+# addons:
+#   apt:
+#     sources:
+#       - llvm-toolchain-precise-3.7
+#     packages:
+#       - libarchive-dev
+#       - clang-3.7
 addons:
   apt:
-    sources:
-      - llvm-toolchain-precise-3.7
     packages:
-      - clang-3.7
-    
+      - libarchive-dev
+
 install:
   - pip install cffi
   - pip install pytest

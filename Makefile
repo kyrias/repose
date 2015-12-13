@@ -23,11 +23,11 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
 	reader.o desc.o
 
-librepose.so: util.c
-	$(LINK.o) $(CFLAGS) -fPIC -shared $^ -o $@
+librepose.so: util.c desc.c
+	$(LINK.o) $(CFLAGS) -fPIC -shared -larchive -lalpm $^ -o $@ -DTRAVIS_CI
 
 tests: librepose.so
-	@py.test -v tests
+	@py.test -v tests $(PYTEST_FLAGS)
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose

@@ -15,6 +15,7 @@ def test_joinstring(ffi, lib, input):
 
 
 @pytest.mark.parametrize("input", [
+    b'Hello World',
     b'Hello World  ',
     b'    Hello World',
     b'\tHello World   '

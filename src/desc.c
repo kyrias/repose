@@ -4,111 +4,184 @@
 #include <stdio.h>
 #include <time.h>
 #include <err.h>
+#include <archive.h>
+
+#ifndef TRAVIS_CI
 #include <alpm_list.h>
+#endif
 
 #include "reader.h"
 #include "package.h"
 #include "util.h"
 
-static inline int read_desc_list(struct archive_reader *reader, alpm_list_t **list)
+struct reader {
+    const char *buf;
+    size_t off;
+    size_t len;
+};
+
+static ssize_t _getline(struct reader *reader, const char **line, size_t *len)
 {
-    char *buf;
-    int nbytes_r;
-    while ((nbytes_r = archive_getline(reader, &buf)) > 0)
-        *list = alpm_list_add(*list, buf);
-    return nbytes_r;
+    *line = &reader->buf[reader->off];
+    *len = strcspn(*line, "\n");
+
+    if (reader->buf[reader->off + *len] == '\0') {
+        reader->off += *len;
+        return -1;
+    }
+
+    reader->off += *len + 1;
+    return 0;
 }
 
-static inline int read_desc_entry(struct archive_reader *reader, char **data)
+static inline int read_desc_list(struct reader *reader, alpm_list_t **list)
 {
-    return archive_getline(reader, data);
+    const char *line;
+    size_t line_len;
+    while (_getline(reader, &line, &line_len) == 0) {
+        if (line_len == 0)
+            break;
+        *list = alpm_list_add(*list, strndup(line, line_len));
+    }
+    return 0;
 }
 
-static inline int read_desc_size(struct archive_reader *reader, size_t *data)
+static inline int read_desc_entry(struct reader *reader, char **data)
 {
-    _cleanup_free_ char *buf;
-    int nbytes_r = archive_getline(reader, &buf);
-    if (nbytes_r > 0)
-        fromstr(buf, data);
-    return nbytes_r;
+    const char *line;
+    size_t line_len;
+    _getline(reader, &line, &line_len);
+    *data = strndup(line, line_len);
+    return 0;
 }
 
-static inline int read_desc_time(struct archive_reader *reader, time_t *data)
+static inline int read_desc_size(struct reader *reader, size_t *data)
 {
-    _cleanup_free_ char *buf;
-    int nbytes_r = archive_getline(reader, &buf);
-    if (nbytes_r > 0)
-        fromstr(buf, data);
-    return nbytes_r;
+    const char *line;
+    size_t line_len;
+    _getline(reader, &line, &line_len);
+    {
+        // TODO: fix
+        _cleanup_free_ char *size = strndup(line, line_len);
+        fromstr(size, data);
+    }
+    return 0;
+}
+
+static inline int read_desc_time(struct reader *reader, time_t *data)
+{
+    const char *line;
+    size_t line_len;
+    _getline(reader, &line, &line_len);
+    {
+        // TODO: fix
+        _cleanup_free_ char *time = strndup(line, line_len);
+        fromstr(time, data);
+    }
+    return 0;
+}
+
+ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
+                      char *buf, size_t buf_len)
+{
+    struct reader reader = {.buf = buf, .len = buf_len};
+
+    for (;;) {
+        const char *line;
+        size_t line_len;
+        ssize_t nbytes_r;
+
+        if (_getline(&reader, &line, &line_len) < 0)
+            break;
+        else if (line_len == 0)
+            continue;
+
+        if (strneq(line, "%FILENAME%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->filename);
+        } else if (strneq(line, "%NAME%", line_len)) {
+            const char *name;
+            size_t name_len;
+            _getline(&reader, &name, &name_len);
+            if (!strneq(name, pkg->name, name_len))
+                errx(EXIT_FAILURE, "database entry %%NAME%% and desc record are mismatched!");
+        } else if (strneq(line, "%BASE%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->base);
+        } else if (strneq(line, "%VERSION%", line_len)) {
+            const char *version;
+            size_t version_len;
+            _getline(&reader, &version, &version_len);
+            if (!strneq(version, pkg->version, version_len))
+                errx(EXIT_FAILURE, "database entry %%VERSION%% and desc record are mismatched!");
+        } else if (strneq(line, "%DESC%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->desc);
+        } else if (strneq(line, "%GROUPS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->groups);
+        } else if (strneq(line, "%CSIZE%", line_len)) {
+            nbytes_r = read_desc_size(&reader, &pkg->size);
+        } else if (strneq(line, "%ISIZE%", line_len)) {
+            nbytes_r = read_desc_size(&reader, &pkg->isize);
+        } else if (strneq(line, "%SHA256SUM%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->sha256sum);
+        } else if(strneq(line, "%PGPSIG%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->base64sig);
+        } else if (strneq(line, "%URL%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->url);
+        } else if (strneq(line, "%LICENSE%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->licenses);
+        } else if (strneq(line, "%ARCH%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->arch);
+        } else if (strneq(line, "%BUILDDATE%", line_len)) {
+            nbytes_r = read_desc_time(&reader, &pkg->builddate);
+        } else if (strneq(line, "%PACKAGER%", line_len)) {
+            nbytes_r = read_desc_entry(&reader, &pkg->packager);
+        } else if (strneq(line, "%REPLACES%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->replaces);
+        } else if (strneq(line, "%DEPENDS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->depends);
+        } else if (strneq(line, "%CONFLICTS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->conflicts);
+        } else if (strneq(line, "%PROVIDES%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->provides);
+        } else if (strneq(line, "%OPTDEPENDS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->optdepends);
+        } else if (strneq(line, "%MAKEDEPENDS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->makedepends);
+        } else if (strneq(line, "%CHECKDEPENDS%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->checkdepends);
+        } else if (strneq(line, "%FILES%", line_len)) {
+            nbytes_r = read_desc_list(&reader, &pkg->files);
+        } else {
+            printf("UNMATCHED: %.*s\n", (int)line_len, line);
+        }
+    }
+
+    /* free(reader); */
+    return 0;
+}
+
+static int archive_read_block(struct archive *archive, char *buf, size_t *buf_len)
+{
+    for (;;) {
+        int status = archive_read_data_block(archive, (void *)&buf,
+                                             buf_len, &(int64_t){0});
+
+        if (status == ARCHIVE_RETRY)
+            continue;
+        if (status <= ARCHIVE_WARN)
+            warnx("%s", archive_error_string(archive));
+
+        return status;
+    }
 }
 
 void read_desc(struct archive *archive, struct pkg *pkg)
 {
-    struct archive_reader *reader = archive_reader_new(archive);
+    struct pkginfo_parser parser = {0};
+    char buf[8192];
 
     for (;;) {
-        char buf[8192];
-        int nbytes_r = archive_fgets(reader, buf, sizeof(buf));
-        if (nbytes_r < 0)
-            break;
-
-        if (streq(buf, "%FILENAME%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->filename);
-        } else if (streq(buf, "%NAME%")) {
-            _cleanup_free_ char *temp = NULL;
-            nbytes_r = read_desc_entry(reader, &temp);
-            if (!streq(temp, pkg->name))
-                errx(EXIT_FAILURE, "database entry %%NAME%% and desc record are mismatched!");
-        } else if (streq(buf, "%BASE%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->base);
-        } else if (streq(buf, "%VERSION%")) {
-            _cleanup_free_ char *temp = NULL;
-            nbytes_r = read_desc_entry(reader, &temp);
-            if (!streq(temp, pkg->version))
-                errx(EXIT_FAILURE, "database entry %%VERSION%% and desc record are mismatched!");
-        } else if (streq(buf, "%DESC%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->desc);
-        } else if (streq(buf, "%GROUPS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->groups);
-        } else if (streq(buf, "%CSIZE%")) {
-            nbytes_r = read_desc_size(reader, &pkg->size);
-        } else if (streq(buf, "%ISIZE%")) {
-            nbytes_r = read_desc_size(reader, &pkg->isize);
-        } else if (streq(buf, "%SHA256SUM%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->sha256sum);
-        } else if(streq(buf, "%PGPSIG%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->base64sig);
-        } else if (streq(buf, "%URL%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->url);
-        } else if (streq(buf, "%LICENSE%")) {
-            nbytes_r = read_desc_list(reader, &pkg->licenses);
-        } else if (streq(buf, "%ARCH%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->arch);
-        } else if (streq(buf, "%BUILDDATE%")) {
-            nbytes_r = read_desc_time(reader, &pkg->builddate);
-        } else if (streq(buf, "%PACKAGER%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->packager);
-        } else if (streq(buf, "%REPLACES%")) {
-            nbytes_r = read_desc_list(reader, &pkg->replaces);
-        } else if (streq(buf, "%DEPENDS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->depends);
-        } else if (streq(buf, "%CONFLICTS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->conflicts);
-        } else if (streq(buf, "%PROVIDES%")) {
-            nbytes_r = read_desc_list(reader, &pkg->provides);
-        } else if (streq(buf, "%OPTDEPENDS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->optdepends);
-        } else if (streq(buf, "%MAKEDEPENDS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->makedepends);
-        } else if (streq(buf, "%CHECKDEPENDS%")) {
-            nbytes_r = read_desc_list(reader, &pkg->checkdepends);
-        } else if (streq(buf, "%FILES%")) {
-            nbytes_r = read_desc_list(reader, &pkg->files);
-        }
-
-        if (nbytes_r < 0)
-            break;
+        size_t nbytes_r = sizeof(buf);
+        archive_read_block(archive, buf, &nbytes_r);
+        parse_pkginfo(&parser, pkg, buf, nbytes_r);
     }
-
-    free(reader);
 }
