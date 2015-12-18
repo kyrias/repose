@@ -1,42 +1,24 @@
 import pytest
 import cffi
 
+_ffi = cffi.FFI()
+_ffi.set_source("_repose", """
+#include <time.h>
+#include <repose.h>
+#include <desc.h>
+#include <util.h>
+""", include_dirs=['../src'],
+     library_dirs=['..'],
+     libraries=['repose'])
 
-def pytest_namespace():
-    return {'FFI': cffi.FFI}
-
-
-@pytest.fixture(scope='session')
-def climits():
-    ffi = pytest.FFI()
-    ffi.cdef("const size_t size_t_max;")
-    return ffi.verify("const size_t size_t_max = (size_t)-1;")
-
-
-@pytest.fixture(scope='session')
-def size_t_max(climits):
-    return climits.size_t_max
-
-
-@pytest.fixture(scope='session')
-def ffi():
-    ffi = pytest.FFI()
-    ffi.cdef("""
+_ffi.cdef("""
 typedef struct __alpm_list_t {
     void *data;
-    struct __alpm_list_t *prev;
     struct __alpm_list_t *next;
+    ...;
 } alpm_list_t;
 
-typedef long long time_t;
-
-struct config {
-    int verbose;
-    int compression;
-    bool reflink;
-    bool sign;
-    char *arch;
-};
+typedef int... time_t;
 
 struct pkg {
     unsigned long name_hash;
@@ -98,19 +80,40 @@ struct pkginfo_parser {
     enum state state;
 };
 
-extern struct config config;
-
+// utils
 char *joinstring(const char *root, ...);
 int str_to_size(const char *str, size_t *out);
 int str_to_time(const char *size, time_t *out);
 char *strstrip(char *s);
 
+// desc
 ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
                       char *buf, size_t buf_len);
 """)
-    return ffi
+
+def pytest_namespace():
+    _ffi.compile(tmpdir='tests')
+    import _repose
+    return {'_repose': _repose}
 
 
 @pytest.fixture(scope='session')
+def climits():
+    ffi = cffi.FFI()
+    ffi.cdef("const size_t size_t_max;")
+    return ffi.verify("const size_t size_t_max = (size_t)-1;")
+
+
+@pytest.fixture(scope='session')
+def size_t_max(climits):
+    return climits.size_t_max
+
+
+@pytest.fixture
+def ffi():
+    return pytest._repose.ffi
+
+
+@pytest.fixture
 def lib(ffi):
-    return ffi.dlopen("./librepose.so")
+    return pytest._repose.lib

@@ -27,7 +27,7 @@ librepose.so: util.c desc.c
 	$(LINK.o) $(CFLAGS) -fPIC -shared -larchive -lalpm $^ -o $@ -DTRAVIS_CI
 
 tests: librepose.so
-	@py.test -v tests $(PYTEST_FLAGS)
+	@LD_LIBRARY_PATH=$(PWD) py.test -v tests $(PYTEST_FLAGS)
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
