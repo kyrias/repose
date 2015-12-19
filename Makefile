@@ -23,11 +23,8 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
 	reader.o desc.o
 
-librepose.so: util.c desc.c
-	$(LINK.o) $(CFLAGS) -fPIC -shared -larchive -lalpm $^ -o $@ -DTRAVIS_CI
-
-tests: librepose.so
-	@LD_LIBRARY_PATH=$(PWD) py.test -v tests $(PYTEST_FLAGS)
+tests:
+	@LD_LIBRARY_PATH=$(PWD) py.test tests $(PYTEST_FLAGS)
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
@@ -35,6 +32,6 @@ install: repose
 	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
-	$(RM) repose librepose.so *.o
+	$(RM) repose *.o
 
 .PHONY: tests clean install uninstall

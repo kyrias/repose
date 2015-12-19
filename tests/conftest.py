@@ -2,15 +2,17 @@ import pytest
 import weakref
 import cffi
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 _ffi = cffi.FFI()
 _ffi.set_source("_repose", """
 #include <time.h>
 #include <repose.h>
 #include <desc.h>
 #include <util.h>
-""", include_dirs=['../src'],
-     library_dirs=['..'],
-     libraries=['repose'])
+""", include_dirs=['../src'], sources=['../src/desc.c', '../src/util.c'],
+                extra_compile_args=['-D_GNU_SOURCE', '-fPIC'], libraries=['archive', 'alpm'])
 
 _ffi.cdef("""
 typedef struct __alpm_list_t {
@@ -91,6 +93,7 @@ char *strstrip(char *s);
 ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
                       char *buf, size_t buf_len);
 """)
+
 
 def pytest_namespace():
     _ffi.compile(tmpdir='tests')
