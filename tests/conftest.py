@@ -2,8 +2,6 @@ import pytest
 import weakref
 import cffi
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
 
 _ffi = cffi.FFI()
 _ffi.set_source("_repose", """
@@ -11,8 +9,12 @@ _ffi.set_source("_repose", """
 #include <repose.h>
 #include <desc.h>
 #include <util.h>
-""", include_dirs=['../src'], sources=['../src/desc.c', '../src/util.c'],
-                extra_compile_args=['-D_GNU_SOURCE', '-fPIC'], libraries=['archive', 'alpm'])
+""",
+    include_dirs=['../src'],
+    sources=['desc.c', 'util.c'],
+    macros=['_GNU_SOURCE'],
+    libraries=['archive', 'alpm'])
+
 
 _ffi.cdef("""
 typedef struct __alpm_list_t {
