@@ -4,16 +4,19 @@ import cffi
 
 
 _ffi = cffi.FFI()
-_ffi.set_source("_repose", """
+_ffi.set_source(
+    "_repose", """
 #include <time.h>
 #include <repose.h>
 #include <desc.h>
 #include <util.h>
 """,
+    extra_compile_args=['-O0', '-g'],
     include_dirs=['../src'],
     sources=['../src/desc.c', '../src/util.c'],
     define_macros=[('_GNU_SOURCE',)],
-    libraries=['archive', 'alpm'])
+    libraries=['archive', 'alpm']
+)
 
 
 _ffi.cdef("""

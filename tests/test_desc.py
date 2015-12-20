@@ -100,14 +100,17 @@ git
 '''
 
     pkg = new_pkg(ffi, b'repose-git', b'5.19.g82c3d4a-1')
-    lib.parse_pkginfo(parser, pkg, REPOSE_DEPENDS, len(REPOSE_DESC))
+    lib.parse_pkginfo(parser, pkg, REPOSE_DEPENDS, len(REPOSE_DEPENDS))
     assert parser.state == lib.PKGINFO_INITIAL
 
     depends = read_alpm_string_list(ffi, pkg.depends)
-    conflicts = read_alpm_string_list(ffi, pkg.conflicts)
-    provides = read_alpm_string_list(ffi, pkg.provides)
-    makedepends = read_alpm_string_list(ffi, pkg.makedepends)
     assert depends == [b'pacman', b'libarchive', b'gnupg']
+
+    conflicts = read_alpm_string_list(ffi, pkg.conflicts)
     assert conflicts == [b'repose']
+
+    provides = read_alpm_string_list(ffi, pkg.provides)
     assert provides == [b'repose']
+
+    makedepends = read_alpm_string_list(ffi, pkg.makedepends)
     assert makedepends == [b'git']

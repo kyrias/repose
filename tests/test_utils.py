@@ -46,7 +46,7 @@ def test_str_to_size_ERANGE(ffi, lib, size_t_max):
 
 
 def test_str_to_time(ffi, lib):
-    arg = ffi.new("char[]", b"832421")
+    arg = ffi.new("char[]", b"1448690669")
     out = ffi.new("time_t *")
 
     assert lib.str_to_time(arg, out) == 0
