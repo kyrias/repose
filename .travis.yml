@@ -5,13 +5,6 @@ cache: bundler
 python:
     - 3.5
 
-# addons:
-#   apt:
-#     sources:
-#       - llvm-toolchain-precise-3.7
-#     packages:
-#       - libarchive-dev
-#       - clang-3.7
 addons:
   apt:
     packages:
@@ -20,6 +13,7 @@ addons:
 install:
   - pip install cffi
   - pip install pytest
+  - pip install pytest-xdist
 
 script:
   - make tests

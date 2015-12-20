@@ -14,6 +14,8 @@ CFLAGS := -std=c11 -g \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)
 
+PYTEST_FLAGS := --boxed $(PYTEST_FLAGS)
+
 VPATH = src
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto
 PREFIX = /usr
