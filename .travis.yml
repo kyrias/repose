@@ -3,7 +3,7 @@ sudo: false
 cache: bundler
 
 python:
-    - python3
+    - 3.5
 
 # addons:
 #   apt:
