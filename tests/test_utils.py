@@ -50,4 +50,4 @@ def test_str_to_time(ffi, lib):
     out = ffi.new("time_t *")
 
     assert lib.str_to_time(arg, out) == 0
-    assert out[0] == 832421
+    assert out[0] == 1448690669

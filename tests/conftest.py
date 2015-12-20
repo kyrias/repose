@@ -5,16 +5,18 @@ import cffi
 
 _ffi = cffi.FFI()
 _ffi.set_source(
-    "_repose", """
+    "_repose",
+    """
 #include <time.h>
 #include <repose.h>
 #include <desc.h>
 #include <util.h>
 """,
-    extra_compile_args=['-O0', '-g'],
+    extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
     include_dirs=['../src'],
     sources=['../src/desc.c', '../src/util.c'],
-    define_macros=[('_GNU_SOURCE',)],
+    define_macros=[('_GNU_SOURCE',),
+                   ('_FILE_OFFSET_BITS', '64')],
     libraries=['archive', 'alpm']
 )
 
@@ -27,6 +29,8 @@ typedef struct __alpm_list_t {
 } alpm_list_t;
 
 typedef int... time_t;
+
+char *strptime(const char *s, const char *format, struct tm *tm);
 
 struct pkg {
     unsigned long name_hash;
