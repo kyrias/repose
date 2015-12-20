@@ -12,11 +12,9 @@ _ffi.set_source(
 #include <desc.h>
 #include <util.h>
 """,
-    extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
     include_dirs=['../src'],
     sources=['../src/desc.c', '../src/util.c'],
-    define_macros=[('_GNU_SOURCE',),
-                   ('_FILE_OFFSET_BITS', '64')],
+    extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
     libraries=['archive', 'alpm']
 )
 
