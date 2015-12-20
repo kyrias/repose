@@ -24,7 +24,7 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	reader.o desc.o
 
 tests:
-	@LD_LIBRARY_PATH=$(PWD) py.test tests $(PYTEST_FLAGS)
+	@py.test tests $(PYTEST_FLAGS)
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose

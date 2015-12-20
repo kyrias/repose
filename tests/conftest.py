@@ -11,8 +11,8 @@ _ffi.set_source("_repose", """
 #include <util.h>
 """,
     include_dirs=['../src'],
-    sources=['desc.c', 'util.c'],
-    macros=['_GNU_SOURCE'],
+    sources=['../src/desc.c', '../src/util.c'],
+    define_macros=[('_GNU_SOURCE',)],
     libraries=['archive', 'alpm'])
 
 
