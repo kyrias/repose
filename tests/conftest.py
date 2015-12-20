@@ -1,25 +1,25 @@
 import pytest
 import weakref
 import cffi
+import importlib
 
 
-_ffi = cffi.FFI()
-_ffi.set_source(
-    "_repose",
-    """
+def load_code(module, source, cdef, **kwargs):
+    new_ffi = cffi.FFI()
+    new_ffi.set_source(module, source, **kwargs)
+    new_ffi.cdef(cdef)
+    new_ffi.compile(tmpdir='tests')
+    return importlib.import_module(module)
+
+
+SOURCE = """
 #include <time.h>
 #include <repose.h>
 #include <desc.h>
 #include <util.h>
-""",
-    include_dirs=['../src'],
-    sources=['../src/desc.c', '../src/util.c'],
-    extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
-    libraries=['archive', 'alpm']
-)
+"""
 
-
-_ffi.cdef("""
+CDEF="""
 typedef struct __alpm_list_t {
     void *data;
     struct __alpm_list_t *next;
@@ -99,12 +99,16 @@ char *strstrip(char *s);
 // desc
 ssize_t parse_pkginfo(struct pkginfo_parser *parser, struct pkg *pkg,
                       char *buf, size_t buf_len);
-""")
+"""
 
 
 def pytest_namespace():
-    _ffi.compile(tmpdir='tests')
-    import _repose
+    _repose = load_code('_repose', SOURCE, CDEF,
+                        include_dirs=['../src'],
+                        sources=['../src/desc.c', '../src/util.c'],
+                        extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
+                        libraries=['archive', 'alpm'])
+
     return {'weakkeydict': weakref.WeakKeyDictionary(),
             '_repose': _repose}
 
