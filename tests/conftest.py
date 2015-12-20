@@ -20,6 +20,8 @@ SOURCE = """
 """
 
 CDEF="""
+#define SIZE_MAX ...
+
 typedef struct __alpm_list_t {
     void *data;
     struct __alpm_list_t *next;
@@ -113,16 +115,9 @@ def pytest_namespace():
             '_repose': _repose}
 
 
-@pytest.fixture(scope='session')
-def climits():
-    ffi = cffi.FFI()
-    ffi.cdef("const size_t size_t_max;")
-    return ffi.verify("const size_t size_t_max = (size_t)-1;")
-
-
-@pytest.fixture(scope='session')
-def size_t_max(climits):
-    return climits.size_t_max
+@pytest.fixture
+def size_t_max(lib):
+    return lib.SIZE_MAX
 
 
 @pytest.fixture
