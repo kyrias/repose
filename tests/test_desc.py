@@ -1,32 +1,7 @@
 import pytest
 
 
-def new_pkg(ffi, name, version):
-    name = ffi.new('char[]', name)
-    version = ffi.new('char[]', version)
-    pkg = ffi.new('struct pkg*', {'name': name,
-                                  'version': version})
-
-    pytest.weakkeydict[pkg] = (name, version)
-    return pkg
-
-
-def read_alpm_string_list(ffi, data):
-    def worker(data):
-        while data != ffi.NULL:
-            yield ffi.string(ffi.cast('char*', data.data))
-            data = data.next
-    return list(worker(data))
-
-
-@pytest.fixture
-def parser(ffi, lib):
-    parser = ffi.new('struct pkginfo_parser*', {'state': 0})
-    return parser
-
-
-def test_parse_desc(ffi, lib, parser):
-    REPOSE_DESC = b'''%FILENAME%
+REPOSE_DESC = b'''%FILENAME%
 repose-git-5.19.g82c3d4a-1-x86_64.pkg.tar.xz
 
 %NAME%
@@ -63,8 +38,64 @@ x86_64
 Simon Gomizelj <simongmzlj@gmail.com>
 '''
 
-    pkg = new_pkg(ffi, b'repose-git', b'5.19.g82c3d4a-1')
-    lib.parse_pkginfo(parser, pkg, REPOSE_DESC, len(REPOSE_DESC))
+
+REPOSE_DEPENDS = b'''%DEPENDS%
+pacman
+libarchive
+gnupg
+
+%CONFLICTS%
+repose
+
+%PROVIDES%
+repose
+
+%MAKEDEPENDS%
+git
+'''
+
+
+def new_pkg(ffi, name, version):
+    name = ffi.new('char[]', name)
+    version = ffi.new('char[]', version)
+    pkg = ffi.new('struct pkg*', {'name': name,
+                                  'version': version})
+
+    pytest.weakkeydict[pkg] = (name, version)
+    return pkg
+
+
+def read_alpm_string_list(ffi, data):
+    def worker(data):
+        while data != ffi.NULL:
+            yield ffi.string(ffi.cast('char*', data.data))
+            data = data.next
+    return list(worker(data))
+
+
+@pytest.fixture
+def parser(ffi, lib):
+    class Parser(object):
+        def __init__(self, ffi):
+            self.parser = ffi.new('struct pkginfo_parser*', {'state': 0})
+
+        def feed(self, pkg, data):
+            return lib.parse_pkginfo(self.parser, pkg, data, len(data))
+
+        @property
+        def state(self):
+            return self.parser.state
+
+    return Parser(ffi)
+
+
+@pytest.fixture
+def pkg(ffi):
+    return new_pkg(ffi, b'repose-git', b'5.19.g82c3d4a-1')
+
+
+def test_parse_desc(ffi, lib, pkg, parser):
+    parser.feed(pkg, REPOSE_DESC)
     assert parser.state == lib.PKGINFO_INITIAL
 
     assert pkg.base == ffi.NULL
@@ -83,24 +114,8 @@ Simon Gomizelj <simongmzlj@gmail.com>
     assert licenses == [b'GPL']
 
 
-def test_parse_depends(ffi, lib, parser):
-    REPOSE_DEPENDS = b'''%DEPENDS%
-pacman
-libarchive
-gnupg
-
-%CONFLICTS%
-repose
-
-%PROVIDES%
-repose
-
-%MAKEDEPENDS%
-git
-'''
-
-    pkg = new_pkg(ffi, b'repose-git', b'5.19.g82c3d4a-1')
-    lib.parse_pkginfo(parser, pkg, REPOSE_DEPENDS, len(REPOSE_DEPENDS))
+def test_parse_depends(ffi, lib, pkg, parser):
+    parser.feed(pkg, REPOSE_DEPENDS)
     assert parser.state == lib.PKGINFO_INITIAL
 
     depends = read_alpm_string_list(ffi, pkg.depends)
@@ -114,3 +129,14 @@ git
 
     makedepends = read_alpm_string_list(ffi, pkg.makedepends)
     assert makedepends == [b'git']
+
+
+def test_partial_parse(ffi, lib, pkg, parser):
+    parser.feed(pkg, b'%DESC%\n')
+    assert ffi.string(pkg.desc) == ffi.NULL
+    assert ffi.string(pkg.desc) == b''
+
+
+def test_partial_parse2(ffi, lib, pkg, parser):
+    parser.feed(pkg, b'%DESC%')
+    assert pkg.desc == ffi.NULL
